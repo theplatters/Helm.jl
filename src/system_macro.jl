@@ -2,8 +2,6 @@ struct Mut{T} end
 struct Res{T} end
 struct ResMut{T} end
 struct Query{T, F} end
-struct With{T} end
-struct Without{T} end
 struct CommandBuffer end
 
 using MacroTools
@@ -130,12 +128,14 @@ macro system(expr)
     setup_exprs = Expr[]
 
     for (k, v) in queries
-        push!(setup_exprs, :($k => Ark.Query(world, $(v[2]), with = $(v[3]), without = $(v[4]))))
+        push!(setup_exprs, :($k = Ark.Query(world, $(v[2]), with = $(v[3]), without = $(v[4]))))
     end
 
     for (k, v) in resources
-        push!(setup_exprs, :($k => Ark.get_resouce(world, $v)))
+        push!(setup_exprs, :($k = Ark.get_resource(world, $v._datatype)))
     end
+
+    @info setup_exprs
 
     return esc(
         quote
