@@ -1,4 +1,4 @@
-# Helmsman.jl
+# Helm.jl
 
 ## An automated scheduler for Ark.jl
 
