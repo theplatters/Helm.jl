@@ -1,4 +1,4 @@
-module Helmsman
+module Helm
 using Ark
 import Graphs as Gr
 

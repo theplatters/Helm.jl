@@ -1,4 +1,4 @@
-name = "Helmsman"
+name = "Helm"
 uuid = "ad10e78d-fd3c-4082-ae24-c059e97af633"
 version = "0.1.0"
 authors = ["Franz Scharnreitner <fscharnreitner@gmail.com>"]
