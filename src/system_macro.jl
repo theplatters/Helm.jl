@@ -58,14 +58,17 @@ function capture_query(query_args)
         end
     end
 
-    return quote
-        Helmsman.QueryData(
-            $(Expr(:tuple, read_comps...)),
-            $(Expr(:tuple, write_comps...)),
-            $(Expr(:tuple, w...)),
-            $(Expr(:tuple, wo...))
-        )
-    end
+    return (
+        quote
+            Helmsman.QueryData(
+                $(Expr(:tuple, read_comps...)),
+                $(Expr(:tuple, write_comps...)),
+                $(Expr(:tuple, w...)),
+                $(Expr(:tuple, wo...))
+            )
+
+        end, Expr(:tuple, read_comps..., write_comps...), Expr(:tuple, w...), Expr(:tuple, wo...),
+    )
 end
 
 function capture_resource_mut(expr)
@@ -89,7 +92,7 @@ macro system(expr)
         error("The system macro has to be applied to functions")
 
 
-    queries = Dict{Symbol, Expr}()
+    queries = Dict{Symbol, NTuple{4, Expr}}()
     resources = Dict{Symbol, Expr}()
     command_buffer_name::Union{Nothing, Symbol} = nothing
     needs_command_buffer = false
@@ -102,6 +105,7 @@ macro system(expr)
             # 2. Pattern match against the type signature
             if @capture(argtype, Query(query_args__))
                 queries[var] = capture_query(query_args)
+
 
             elseif @capture(argtype, Res(res_body_))
                 resources[var] = capture_resource(res_body)
@@ -122,27 +126,26 @@ macro system(expr)
         end
     end
 
+
     setup_exprs = Expr[]
 
-    for (var, query_expr) in queries
-        push!(setup_exprs, :($var = Helmsman.fetch_query(world, $query_expr)))
+    for (k, v) in queries
+        push!(setup_exprs, :($k => Ark.Query(world, $(v[2]), with = $(v[3]), without = $(v[4]))))
     end
 
-    for (var, res_expr) in resources
-        push!(setup_exprs, :($var = Helmsman.fetch_resource(world, $res_expr)))
-    end
-
-    if !isnothing(command_buffer_name)
-        push!(setup_exprs, :($(command_buffer_name) = Helmsman.CommandBuffer(world)))
+    for (k, v) in resources
+        push!(setup_exprs, :($k => Ark.get_resouce(world, $v)))
     end
 
     return esc(
         quote
 
-            Helmsman.System(
+            $f = Helmsman.System(
                 world -> begin
+                    $(setup_exprs...)
+                    $body
                 end,
-                $(Expr(:tuple, values(queries)...)),
+                $(Expr(:tuple, [v[1] for (_, v) in queries]...)),
                 $(Expr(:tuple, values(resources)...)),
                 $needs_command_buffer
             )
