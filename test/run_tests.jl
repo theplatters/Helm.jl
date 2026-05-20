@@ -1,7 +1,8 @@
 using Test
-using Helmsman
+using Helm
 
 include("system_macro.jl")
+include("schedule_parallel.jl")
 
 
 

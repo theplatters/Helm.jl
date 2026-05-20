@@ -1,6 +1,9 @@
 module Helm
-using Ark
+import Ark
 import Graphs as Gr
+
+export Schedule, get_execution_order, chain, after, before, @system
+export Query, Mut, Res, ResMut, CommandBuffer
 
 include("systems.jl")
 include("commands.jl")

@@ -1,7 +1,20 @@
 struct Schedule{N, T <: Tuple{Vararg{AbstractSystem, N}}}
     _systems::T
     _dependency_graph::Gr.SimpleDiGraph{Int64}
-    _execution_order::Vector{Int}
+    _execution_stages::Vector{Vector{Int}}
+end
+
+struct SystemChain{N, T <: Tuple{Vararg{AbstractSystem, N}}} <: AbstractSystem
+    _systems::T
+end
+
+function chain(systems::AbstractSystem...)
+    return SystemChain(systems)
+end
+
+struct SystemDependency{T <: AbstractSystem, U <: AbstractSystem} <: AbstractSystem
+    _before::T
+    _after::U
 end
 
 function extract_unique_systems!(sys::System, flat_list, id_map)
@@ -83,23 +96,26 @@ function Schedule(systems::AbstractSystem...)
         build_edges!(s, graph, id_map)
     end
 
+    # Third Pass: Automatic Dependency Discovery
+    for i in 1:length(flat_list)
+        for j in (i + 1):length(flat_list)
+            s1 = flat_list[i]
+            s2 = flat_list[j]
 
-    sorted_ids = Gr.topological_sort_by_dfs(graph)
+            if conflicts(s1, s2)
+                # If they conflict, and no explicit path exists, add an edge i -> j
+                # to maintain original argument order as a tie-breaker.
+                if !Gr.has_path(graph, i, j) && !Gr.has_path(graph, j, i)
+                    Gr.add_edge!(graph, i, j)
+                end
+            end
+        end
+    end
 
-    return Schedule(Tuple(flat_list), graph, sorted_ids)
-end
 
-struct SystemChain{N, T <: Tuple{Vararg{AbstractSystem, N}}} <: AbstractSystem
-    _systems::T
-end
+    stages = topological_sort_in_layers(graph)
 
-function chain(systems::AbstractSystem...)
-    return SystemChain(systems)
-end
-
-struct SystemDependency{T <: AbstractSystem, U <: AbstractSystem} <: AbstractSystem
-    _before::T
-    _after::U
+    return Schedule(Tuple(flat_list), graph, stages)
 end
 
 function after(s::AbstractSystem, u::AbstractSystem)
@@ -110,10 +126,68 @@ function before(s::AbstractSystem, u::AbstractSystem)
     return SystemDependency(s, u)
 end
 
-function get_execution_order(schedule::Schedule)
-    # This reads the graph edges and returns a valid sequence of IDs
-    sorted_ids = Gr.topological_sort_by_dfs(schedule._dependency_graph)
+function reads(chain::SystemChain)
+    r = Set{Any}()
+    for s in chain._systems
+        union!(r, reads(s))
+    end
+    return r
+end
 
+function writes(chain::SystemChain)
+    w = Set{Any}()
+    for s in chain._systems
+        union!(w, writes(s))
+    end
+    return w
+end
+
+function reads(dep::SystemDependency)
+    return union(reads(dep._before), reads(dep._after))
+end
+
+function writes(dep::SystemDependency)
+    return union(writes(dep._before), writes(dep._after))
+end
+
+function conflicts(s1::AbstractSystem, s2::AbstractSystem)
+    r1, w1 = reads(s1), writes(s1)
+    r2, w2 = reads(s2), writes(s2)
+
+    return !isempty(intersect(w1, r2)) ||
+        !isempty(intersect(w1, w2)) ||
+        !isempty(intersect(r1, w2))
+end
+
+function topological_sort_in_layers(graph::Gr.SimpleDiGraph{Int})
+    in_degrees = [length(Gr.inneighbors(graph, i)) for i in 1:Gr.nv(graph)]
+    ready_nodes = [i for i in 1:Gr.nv(graph) if in_degrees[i] == 0]
+
+    stages = Vector{Vector{Int}}()
+
+    while !isempty(ready_nodes)
+        push!(stages, ready_nodes)
+
+        next_ready = Int[]
+        for node in ready_nodes
+            for neighbor in Gr.outneighbors(graph, node)
+                in_degrees[neighbor] -= 1
+                if in_degrees[neighbor] == 0
+                    push!(next_ready, neighbor)
+                end
+            end
+        end
+        ready_nodes = next_ready
+    end
+
+    if sum(length, stages) != Gr.nv(graph)
+        error("Cycle detected in scheduling graph! Cannot execute systems.")
+    end
+
+    return stages
+end
+
+function get_execution_order(schedule::Schedule)
     # Map the IDs back to the actual systems using our flat_list
-    return [schedule._systems[id] for id in sorted_ids]
+    return [[schedule._systems[id] for id in stage] for stage in schedule._execution_stages]
 end
