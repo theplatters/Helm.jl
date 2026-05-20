@@ -44,14 +44,11 @@ function Ark.Query(
         WI_Tuple <: Tuple,
         WO_Tuple <: Tuple,
     }
-    # 1. Safely extract the data types from the Tuple type structures
-    # .parameters gives us a tuple of the types inside the Tuple{...}
     r_types = R_Tuple.parameters
     w_types = W_Tuple.parameters
     wi_types = WI_Tuple.parameters
     wo_types = WO_Tuple.parameters
 
-    # 2. Re-combine them into standard runtime values for your original Ark.Query
     comp_types = (r_types..., w_types...)
 
     return Ark.Query(w, comp_types; with = (wi_types...,), without = (wo_types...,))
@@ -68,24 +65,20 @@ struct System{T, C <: Tuple{Vararg{SystemConfig}}} <: AbstractSystem
     _configs::C
 end
 
-# If the configuration is a QueryData, instantiate the live Query object
 @inline function fetch_arg(world::Ark.World, q::QueryData)
     return Ark.Query(world, q)
 end
 
-# If the configuration is a ResourceData, pull the live resource instance
 @inline function fetch_arg(world::Ark.World, r::ResourceData)
     return Ark.get_resource(world, r._datatype)
 end
 
 
 function (sys::System)(world::Ark.World)
-    # 1. Map over the configurations in their exact positional order
     runtime_args = map(sys._configs) do config
         fetch_arg(world, config)
     end
 
-    # 2. Safely splat into the user's function
     return sys._f(runtime_args...)
 end
 
@@ -97,18 +90,39 @@ reads(::ResourceData{T, false}) where {T} = (T,)
 writes(::ResourceData{T, false}) where {T} = ()
 writes(::ResourceData{T, true}) where {T} = (T,)
 
-function reads(sys::System)
-    r = Set{Any}()
-    for q in sys._configs
-        union!(r, reads(q))
+reads(::Type{QueryData{R, W, WI, WO}}) where {R, W, WI, WO} = R.parameters
+writes(::Type{QueryData{R, W, WI, WO}}) where {R, W, WI, WO} = W.parameters
+
+reads(::Type{ResourceData{D, false}}) where {D} = (D,)
+reads(::Type{ResourceData{D, true}}) where {D} = ()
+
+writes(::Type{ResourceData{D, false}}) where {D} = ()
+writes(::Type{ResourceData{D, true}}) where {D} = (D,)
+
+
+@generated function reads(sys::System{T, C}) where {T, C}
+    all_reads = DataType[]
+
+    for config_type in C.parameters
+        for r_sym in reads(config_type)
+            push!(all_reads, r_sym)
+        end
     end
-    return r
+
+    unique_reads = Tuple(unique(all_reads))
+    return :($unique_reads)
 end
 
-function writes(sys::System)
-    r = Set{Any}()
-    for q in sys._configs
-        union!(r, writes(q))
+
+@generated function writes(sys::System{T, C}) where {T, C}
+    all_writes = DataType[]
+
+    for config_type in C.parameters
+        for w_sym in writes(config_type)
+            push!(all_writes, w_sym)
+        end
     end
-    return r
+
+    unique_writes = Tuple(unique(all_writes))
+    return :($unique_writes)
 end

@@ -18,22 +18,24 @@ struct SystemDependency{T <: AbstractSystem, U <: AbstractSystem} <: AbstractSys
 end
 
 function extract_unique_systems!(sys::System, flat_list, id_map)
-    return if !haskey(id_map, sys)
+    if !haskey(id_map, sys)
         push!(flat_list, sys)
         id_map[sys] = length(flat_list) # ID is simply its index in the flat list
     end
+    return nothing
 end
 
 function extract_unique_systems!(chain::SystemChain, flat_list, id_map)
     for s in chain._systems
         extract_unique_systems!(s, flat_list, id_map)
     end
-    return
+    return nothing
 end
 
 function extract_unique_systems!(dep::SystemDependency, flat_list, id_map)
     extract_unique_systems!(dep._before, flat_list, id_map)
-    return extract_unique_systems!(dep._after, flat_list, id_map)
+    extract_unique_systems!(dep._after, flat_list, id_map)
+    return nothing
 end
 # Helper to build edges. Returns (entry_nodes, exit_nodes) for any block
 function build_edges!(sys::System, graph, id_map)
@@ -126,29 +128,6 @@ function before(s::AbstractSystem, u::AbstractSystem)
     return SystemDependency(s, u)
 end
 
-function reads(chain::SystemChain)
-    r = Set{Any}()
-    for s in chain._systems
-        union!(r, reads(s))
-    end
-    return r
-end
-
-function writes(chain::SystemChain)
-    w = Set{Any}()
-    for s in chain._systems
-        union!(w, writes(s))
-    end
-    return w
-end
-
-function reads(dep::SystemDependency)
-    return union(reads(dep._before), reads(dep._after))
-end
-
-function writes(dep::SystemDependency)
-    return union(writes(dep._before), writes(dep._after))
-end
 
 function conflicts(s1::AbstractSystem, s2::AbstractSystem)
     r1, w1 = reads(s1), writes(s1)
@@ -188,6 +167,76 @@ function topological_sort_in_layers(graph::Gr.SimpleDiGraph{Int})
 end
 
 function get_execution_order(schedule::Schedule)
-    # Map the IDs back to the actual systems using our flat_list
     return [[schedule._systems[id] for id in stage] for stage in schedule._execution_stages]
+end
+
+reads(::Type{<:System{T, C}}) where {T, C} = reads_from_config_tuple(C)
+writes(::Type{<:System{T, C}}) where {T, C} = writes_from_config_tuple(C)
+
+function reads_from_config_tuple(::Type{C}) where {C <: Tuple}
+    all_reads = Any[]
+    for config_type in C.parameters
+        for r_type in reads(config_type)
+            push!(all_reads, r_type)
+        end
+    end
+    return Tuple(unique(all_reads))
+end
+
+function writes_from_config_tuple(::Type{C}) where {C <: Tuple}
+    all_writes = Any[]
+    for config_type in C.parameters
+        for w_type in writes(config_type)
+            push!(all_writes, w_type)
+        end
+    end
+    return Tuple(unique(all_writes))
+end
+
+
+reads(::Type{<:SystemChain{N, T}}) where {N, T} = reads_from_systems_tuple(T)
+
+@generated function reads(chain::SystemChain{N, T}) where {N, T}
+    return :($(reads_from_systems_tuple(T)))
+end
+
+function reads_from_systems_tuple(::Type{T}) where {T <: Tuple}
+    all_reads = Any[]
+    for sys_type in T.parameters
+        # This will now successfully find reads(::Type{<:System})!
+        for r_type in reads(sys_type)
+            push!(all_reads, r_type)
+        end
+    end
+    return Tuple(unique(all_reads))
+end
+
+
+writes(::Type{<:SystemChain{N, T}}) where {N, T} = writes_from_systems_tuple(T)
+
+@generated function writes(chain::SystemChain{N, T}) where {N, T}
+    return :($(writes_from_systems_tuple(T)))
+end
+
+function writes_from_systems_tuple(::Type{T}) where {T <: Tuple}
+    all_writes = Any[]
+    for sys_type in T.parameters
+        for w_type in writes(sys_type)
+            push!(all_writes, w_type)
+        end
+    end
+    return Tuple(unique(all_writes))
+end
+
+
+reads(::Type{<:SystemDependency{U, V}}) where {U, V} = Tuple(unique((reads(U)..., reads(V)...)))
+
+@generated function reads(dep::SystemDependency{U, V}) where {U, V}
+    return :($(reads(U)..., reads(V)...))
+end
+
+writes(::Type{<:SystemDependency{U, V}}) where {U, V} = Tuple(unique((writes(U)..., writes(V)...)))
+
+@generated function writes(dep::SystemDependency{U, V}) where {U, V}
+    return :($(writes(U)..., writes(V)...))
 end
