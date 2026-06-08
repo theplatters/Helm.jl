@@ -8,7 +8,3 @@ Ark = "56664e29-41e4-4ea5-ab0e-825499acc647"
 Graphs = "86223c79-3864-5bf0-83f7-82e725a168b6"
 MacroTools = "1914dd2f-81c6-5fcd-8719-6d5c9610ff09"
 
-[compat]
-Ark = "0.4.0"
-Graphs = "1.14.0"
-MacroTools = "0.5.16"

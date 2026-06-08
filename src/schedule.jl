@@ -17,6 +17,14 @@ struct SystemDependency{T <: AbstractSystem, U <: AbstractSystem} <: AbstractSys
     _after::U
 end
 
+function after(s::AbstractSystem, u::AbstractSystem)
+    return SystemDependency(u, s)
+end
+
+function before(s::AbstractSystem, u::AbstractSystem)
+    return SystemDependency(s, u)
+end
+
 function extract_unique_systems!(sys::System, flat_list, id_map)
     if !haskey(id_map, sys)
         push!(flat_list, sys)
@@ -118,14 +126,6 @@ function Schedule(systems::AbstractSystem...)
     stages = topological_sort_in_layers(graph)
 
     return Schedule(Tuple(flat_list), graph, stages)
-end
-
-function after(s::AbstractSystem, u::AbstractSystem)
-    return SystemDependency(u, s)
-end
-
-function before(s::AbstractSystem, u::AbstractSystem)
-    return SystemDependency(s, u)
 end
 
 

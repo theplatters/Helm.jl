@@ -1,39 +1,5 @@
 abstract type AbstractSystem <: Function end
 
-abstract type SystemConfig end
-
-struct QueryData{R, W, WI, WO} <: SystemConfig end
-struct Mut{T} end
-
-Mut(::Type{T}) where {T} = Mut{T}()
-
-_unwrap_comp(::Type{T}) where {T} = (T, :read)
-_unwrap_comp(::Mut{T}) where {T} = (T, :write)
-
-_sort_comps(::Tuple{}, reads::Tuple, writes::Tuple) = (reads, writes)
-
-function _sort_comps(comps::Tuple, reads::Tuple, writes::Tuple)
-    head = comps[1]
-    tail = Base.tail(comps)
-
-    T, mode = _unwrap_comp(head)
-
-    if mode === :read
-        return _sort_comps(tail, (reads..., T), writes)
-    else
-        return _sort_comps(tail, reads, (writes..., T))
-    end
-end
-
-function separate_reads_and_writes(comps::Tuple)
-    return _sort_comps(comps, (), ())
-end
-
-function Query(comps::Tuple; with = (), without = ())
-    R, W = separate_reads_and_writes(comps)
-    return QueryData{Tuple{R...}, Tuple{W...}, Tuple{with...}, Tuple{without...}}()
-end
-
 
 function Ark.Query(
         w::Ark.World,
@@ -54,15 +20,14 @@ function Ark.Query(
     return Ark.Query(w, comp_types; with = (wi_types...,), without = (wo_types...,))
 end
 
-Res(::Type{T}) where {T} = ResourceData{T, false}()
-ResMut(::Type{T}) where {T} = ResourceData{T, true}()
-
-
-struct ResourceData{D, M} <: SystemConfig end
 
 struct System{T, C <: Tuple{Vararg{SystemConfig}}} <: AbstractSystem
     _f::T
     _configs::C
+end
+
+function System(f::F, configs::Vararg{SystemConfig, N}) where {F <: Function, N}
+    return System(f, configs)
 end
 
 @inline function fetch_arg(world::Ark.World, q::QueryData)
@@ -73,6 +38,12 @@ end
     return Ark.get_resource(world, r._datatype)
 end
 
+@inline function fetch_arg(world::Ark.World, ::CommandBuffer)
+    bfg = Ark.get_resource(world, CommandBuffer)
+    tid = Threads.threadid()
+    return ThreadCommandBuffer(bfg.streams[tid])
+end
+
 
 function (sys::System)(world::Ark.World)
     runtime_args = map(sys._configs) do config
@@ -81,23 +52,6 @@ function (sys::System)(world::Ark.World)
 
     return sys._f(runtime_args...)
 end
-
-reads(::QueryData{R, W, WI, WO}) where {R, W, WI, WO} = R
-writes(::QueryData{R, W, WI, WO}) where {R, W, WI, WO} = W
-
-
-reads(::ResourceData{T, false}) where {T} = (T,)
-writes(::ResourceData{T, false}) where {T} = ()
-writes(::ResourceData{T, true}) where {T} = (T,)
-
-reads(::Type{QueryData{R, W, WI, WO}}) where {R, W, WI, WO} = R.parameters
-writes(::Type{QueryData{R, W, WI, WO}}) where {R, W, WI, WO} = W.parameters
-
-reads(::Type{ResourceData{D, false}}) where {D} = (D,)
-reads(::Type{ResourceData{D, true}}) where {D} = ()
-
-writes(::Type{ResourceData{D, false}}) where {D} = ()
-writes(::Type{ResourceData{D, true}}) where {D} = (D,)
 
 
 @generated function reads(sys::System{T, C}) where {T, C}
