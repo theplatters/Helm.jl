@@ -1,26 +1,6 @@
 abstract type AbstractSystem <: Function end
 
 
-function Ark.Query(
-        w::Ark.World,
-        ::QueryData{R_Tuple, W_Tuple, WI_Tuple, WO_Tuple}
-    ) where {
-        R_Tuple <: Tuple,
-        W_Tuple <: Tuple,
-        WI_Tuple <: Tuple,
-        WO_Tuple <: Tuple,
-    }
-    r_types = R_Tuple.parameters
-    w_types = W_Tuple.parameters
-    wi_types = WI_Tuple.parameters
-    wo_types = WO_Tuple.parameters
-
-    comp_types = (r_types..., w_types...)
-
-    return Ark.Query(w, comp_types; with = (wi_types...,), without = (wo_types...,))
-end
-
-
 struct System{T, C <: Tuple{Vararg{SystemConfig}}} <: AbstractSystem
     _f::T
     _configs::C

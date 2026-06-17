@@ -15,6 +15,7 @@ include("CommandBuffer/buffer.jl")
 include("CommandBuffer/commands.jl")
 
 include("systems.jl")
+include("system_macro.jl")
 include("schedule.jl")
 include("scheduler.jl")
 
