@@ -1,6 +1,5 @@
 using Test
 using Helm
-using Ark
 
 # Mock components for testing
 struct Comp1 end
@@ -8,11 +7,11 @@ struct Comp2 end
 struct Comp3 end
 
 # Define systems with different access patterns
-@system sys_r1(q::Query((Const(Comp1),))) = begin end
-@system sys_r2(q::Query((Const(Comp2),))) = begin end
-@system sys_w1(q::Query((Comp1,))) = begin end
-@system sys_w2(q::Query((Comp2,))) = begin end
-@system sys_r1_r2(q::Query((Const(Comp1), Const(Comp2)))) = begin end
+sys_r1 = Helm.System(_q -> nothing, Query((Const(Comp1),)))
+sys_r2 = Helm.System(_q -> nothing, Query((Const(Comp2),)))
+sys_w1 = Helm.System(_q -> nothing, Query((Comp1,)))
+sys_w2 = Helm.System(_q -> nothing, Query((Comp2,)))
+sys_r1_r2 = Helm.System(_q -> nothing, Query((Const(Comp1), Const(Comp2))))
 
 @testset "Parallel Scheduling" begin
   @testset "Completely Independent Systems" begin
@@ -39,7 +38,7 @@ struct Comp3 end
 
   @testset "Write-Write Conflict" begin
     # w1 writes Comp1, another system also writes Comp1
-    @system sys_w1_alt(q::Query((Comp1,))) = begin end
+    sys_w1_alt = Helm.System(_q -> nothing, Query((Comp1,)))
     s = Schedule(sys_w1, sys_w1_alt)
     stages = get_execution_order(s)
 
