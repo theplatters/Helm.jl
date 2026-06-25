@@ -30,7 +30,7 @@ function Query(comps::Tuple; with=(), without=())
   return QueryData{Tuple{R...},Tuple{W...},Tuple{with...},Tuple{without...}}()
 end
 
-function Ark.Query(
+@generated function Ark.Query(
   w::Ark.World,
   ::QueryData{R_Tuple,W_Tuple,WI_Tuple,WO_Tuple}
 ) where {
@@ -39,14 +39,14 @@ function Ark.Query(
   WI_Tuple<:Tuple,
   WO_Tuple<:Tuple,
 }
-  r_types = R_Tuple.parameters
+  r_types = map(x -> Ark.Const{x}, R_Tuple.parameters)
   w_types = W_Tuple.parameters
   wi_types = WI_Tuple.parameters
   wo_types = WO_Tuple.parameters
 
   comp_types = (r_types..., w_types...)
 
-  return Ark.Query(w, comp_types; with=(wi_types...,), without=(wo_types...,))
+  return :(Ark.Query(w, $comp_types; with=$((wi_types...,)), without=$((wo_types...,))))
 end
 
 reads(::QueryData{R,W,WI,WO}) where {R,W,WI,WO} = R
