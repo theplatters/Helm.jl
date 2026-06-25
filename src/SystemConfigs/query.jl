@@ -1,10 +1,10 @@
 struct QueryData{R,W,WI,WO} <: SystemConfig end
 struct Const{T} end
 
-Const(::Type{T}) where {T} = Const{T}()
+Const(::Type{T}) where {T} = Const{T}
 
 _unwrap_comp(::Type{T}) where {T} = (T, :write)
-_unwrap_comp(::Const{T}) where {T} = (T, :read)
+_unwrap_comp(::Type{Const{T}}) where {T} = (T, :read)
 
 _sort_comps(::Tuple{}, reads::Tuple, writes::Tuple) = (reads, writes)
 
@@ -39,7 +39,7 @@ end
   WI_Tuple<:Tuple,
   WO_Tuple<:Tuple,
 }
-  r_types = map(x -> Ark.Const{x}, R_Tuple.parameters)
+  r_types = map(x -> Ark.Const{X}, R_Tuple.parameters)
   w_types = W_Tuple.parameters
   wi_types = WI_Tuple.parameters
   wo_types = WO_Tuple.parameters
