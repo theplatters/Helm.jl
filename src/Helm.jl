@@ -3,7 +3,7 @@ import Ark
 import Graphs as Gr
 
 export @system, Schedule, after, before, chain, get_execution_order
-export CommandBuffer, Mut, Query, Res, ResMut
+export CommandBuffer, Const, Query, Res, ResMut
 
 include("SystemConfigs/system_configs.jl")
 include("SystemConfigs/query.jl")

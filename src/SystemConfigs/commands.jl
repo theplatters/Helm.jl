@@ -86,7 +86,6 @@ function _extract_component_types(VT::Type{<:Tuple})
   return Tuple{component_types...}
 end
 
-# --- Dispatch on the command function ---
 
 function _spec_command_type(spec::Tuple{typeof(Ark.new_entity!),T}) where {T<:Tuple}
   val_tuple = _valtuple(spec[2])            # (Val{Int}(), Val{Float64}())
