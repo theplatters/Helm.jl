@@ -39,7 +39,7 @@ end
   WI_Tuple<:Tuple,
   WO_Tuple<:Tuple,
 }
-  r_types = map(x -> Ark.Const{X}, R_Tuple.parameters)
+  r_types = map(T -> Ark.Const{T}, R_Tuple.parameters)
   w_types = W_Tuple.parameters
   wi_types = WI_Tuple.parameters
   wo_types = WO_Tuple.parameters

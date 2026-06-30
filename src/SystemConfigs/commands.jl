@@ -110,7 +110,6 @@ end
 function _spec_command_type(
   spec::Tuple{typeof(Ark.exchange_components!),NamedTuple{(:add, :remove),<:Tuple{A,R}}}
 ) where {A<:Tuple,R<:Tuple}
-  # spec[2] is (add = (Type1, Type2), remove = (Type3,))
   add_val_tuple = _valtuple(spec[2].add)
   remove_val_tuple = _valtuple(spec[2].remove)
   VT_add = typeof(add_val_tuple)
